@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Report_CICDTest_PBI_AdWorks"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "a00dfe86-2ab5-4caa-9701-8fdd1e359cb6"
+  }
+}

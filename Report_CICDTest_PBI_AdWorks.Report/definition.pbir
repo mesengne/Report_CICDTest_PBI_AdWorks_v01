@@ -1,0 +1,9 @@
+{
+  "version": "4.0",
+  "datasetReference": {
+    "byPath": {
+      "path": "../Report_CICDTest_PBI_AdWorks.SemanticModel"
+    },
+    "byConnection": null
+  }
+}
