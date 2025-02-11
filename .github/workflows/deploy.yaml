@@ -1,0 +1,84 @@
+name: Deploy PowerBI report
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: choice
+        options: 
+          - test
+          - preprod
+          - client1
+          - client2
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install from PSGallery
+      shell: pwsh
+      env:
+        WORKING_FOLDER: ${{ github.workspace }}
+      run: |
+        Set-PSRepository PSGallery -InstallationPolicy Trusted
+        Install-Module SqlServer, PSScriptAnalyzer
+
+        $workingFolder = "$WORKING_FOLDER"
+        Write-Host "##[debug]workingFolder: $workingFolder
+
+        New-Item -ItemType Directory -Path "$workingFolder\modules" -ErrorAction SilentlyContinue | Out-Null
+
+        Write-Host "##[debug]Downloading FabricPS-PBIP module"
+        @(
+            "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/pbidevmode/fabricps-pbip/FabricPS-PBIP.psm1",
+            "https://raw.githubusercontent.com/microsoft/Analysis-Services/master/pbidevmode/fabricps-pbip/FabricPS-PBIP.psd1") |% {
+                
+                Invoke-WebRequest -Uri $_ -OutFile "$workingFolder\modules\$(Split-Path $_ -Leaf)"
+            }
+
+        Write-Host "##[debug]Installing Az.Accounts"
+
+        if(-not (Get-Module Az.Accounts -ListAvailable)){
+            Install-Module Az.Accounts -Scope CurrentUser -Force
+        }
+
+    - name: Build script
+      shell: pwsh
+      env:
+        WORKING_FOLDER: ${{ github.workspace }}
+        CLIENT_ID: ${{ secrets.client_id }}
+        CLIENT_SECRET: ${{ secrets.client_secret }}
+        TENANT_ID: ${{ secrets.tenant_id }}
+        WORKSPACE_NAME: ${{ env.workspace_name }}
+      run: |
+        $workingFolder = "$WORKING_FOLDER"
+        $appId = "$CLIENT_ID"
+        $appSecret = "$CLIENT_SECRET"
+        $tenantId = "$TENANT_ID"
+        $workspaceName = "$WORKSPACE_NAME"
+
+        Write-Host "##[debug]workingFolder: $WORKING_FOLDER appId $appId workspaceName $workspaceName"
+
+        Import-Module "$workingFolder\modules\FabricPS-PBIP" -Force
+        
+        Write-Host "##[debug]Authentication with SPN $appId"
+        Set-FabricAuthToken -servicePrincipalId $appId -servicePrincipalSecret $appSecret -tenantId $tenantId -reset
+
+        Write-Host "##[debug]Get workspace $workspaceName"
+        $workspaceId = Get-FabricWorkspace  -name $workspaceName
+
+        Write-Host "##[debug]Publish report"
+        $importInfo = Import-FabricItems -workspaceId $workspaceId -path $workingFolder
+        Write-Host "##[debug]Imported report $importInfo"
+
+
+
